@@ -1,96 +1,70 @@
 package main
 
 import (
-	"net/http"
+	"golang-pustaka-api/handler"
+	"golang-pustaka-api/models"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 func main() {
-	// This is a comment
-	router := gin.Default()
-	router.GET("/", rootHandler) 
-	router.GET("/ping", pingHandler)
-	router.GET("/books", getBooksHandler)
-	router.POST("/books", bookPostHandler)
-	router.POST("/book", postBookHandler)
-	router.GET("/book/:id", bookDetailHandler) 
-	router.GET("/query", queryHandler)
+	// Database Connection
+	dsn := "root:@tcp(127.0.0.1:3306)/pustaka-api?charset=utf8mb4&parseTime=True&loc=Local"
+  	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		panic("Failed to connect to database!")
+	}
+	db.AutoMigrate(&models.Book{}) // wajib pointer
+	
+	// Repository
+	bookRepository := models.NewRepository(db)
 
+	// Implementasi Repo 
+	books, err := bookRepository.GetBooks()
+	if err != nil {
+		panic("Failed to get books!")
+	}
+
+	for _, book := range books {
+		println(book.Title)
+	}
+
+	// Create Book
+	books2 := models.Book{
+		Title:  "Belajar Golang",
+		Author: "Ardya Pusaka",
+		Price:  100000,
+	}
+
+	bookRepository.CreateBook(books2)
+	
+	
+
+
+	 
+
+	
+	
+
+
+
+
+	// This is a default router
+	router := gin.Default()
+
+	// Api Versioning
+	// Jadi studi kasusnya misal ada 2 versi API, versi 1 dan versi 2 yang berbeda struktur API nya maka bisa menggunakan cara ini agar tidak bentrok
+	v1 := router.Group("/v1")
+	v1.GET("/", handler.RootHandler) 
+	v1.GET("/ping", handler.PingHandler)
+	v1.GET("/books", handler.GetBooksHandler)
+	v1.POST("/book", handler.BookPostHandler)
+	v1.GET("/book/:id", handler.BookDetailHandler) 
+	v1.GET("/query", handler.QueryHandler)
+
+	
 	router.Run(":8080")
 }
 
-func rootHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"name":    "Ardya Pusaka",
-		"message": "Hello, adas!",
-	})
-}
-
-func pingHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"message": "pong",
-		"status":  http.StatusOK,
-	})
-}
-
-func queryHandler(c *gin.Context) {
-	id := c.Query("id")
-	page := c.DefaultQuery("page", "1")
-	c.JSON(http.StatusOK, gin.H{
-		"id":   id,
-		"page": page,
-	})
-}
-
-// Struct untuk data buku
-type Book struct {
-	ID     string `json:"id"`
-	Title  string `json:"title"`
-	Author string `json:"author"`
-	Price  int    `json:"price"`
-}
-
-var books = []Book{
-	{ID: "1", Title: "The Go Programming Language", Author: "Alan A. A. Donovan", Price: 500000},
-	{ID: "2", Title: "Introducing Go", Author: "Caleb Doxsey", Price: 300000},
-}
-
-func getBooksHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, books)
-}
-
-func bookDetailHandler(c *gin.Context) {
-	id := c.Param("id")
-	for _, book := range books {
-		if book.ID == id {
-			c.JSON(http.StatusOK, book)
-			return
-		}
-	}
-	c.JSON(http.StatusNotFound, gin.H{"message": "Book not found"})
-}
-
-func bookPostHandler(c *gin.Context) {
-	var book Book
-	if err := c.ShouldBindJSON(&book); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	books = append(books, book)
-	c.JSON(http.StatusCreated, book)
-}
-
-// contoh youtube :
-func postBookHandler (c *gin.Context) {
-	var book Book
-	if err := c.ShouldBindJSON(&book); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(200,gin.H{
-		"title" : book.Title,
-		"author" : book.Author,
-		"price" : book.Price,
-	})
-}
