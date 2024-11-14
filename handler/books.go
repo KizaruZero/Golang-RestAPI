@@ -1,21 +1,17 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"golang-pustaka-api/models"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 )
 
-// Agar bisa di panggil di main.go, maka harus di export (Huruf depannya huruf besar) wajib nama fungsi huruf depannya besar
-func RootHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"name":    "Ardya Pusaka",
-		"message": "Hello, adas!",
-	})
-}
+
 
 func PingHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
@@ -33,54 +29,107 @@ func QueryHandler(c *gin.Context) {
 	})
 }
 
-
-
-var books = []models.Book{
-	{ID: 1, Title: "The Go Programming Language", Author: "Alan A. A. Donovan", Price: 500000},
-	{ID: 1, Title: "Introducing Go", Author: "Caleb Doxsey", Price: 300000},
+type BookHandler struct {
+	bookService models.Service
 }
 
-func GetBooksHandler(c *gin.Context) {
+// Studi Kasus
+func NewBookHandler(bookService models.Service) *BookHandler {
+	return &BookHandler{
+		bookService,
+	}
+}
+
+// Agar bisa di panggil di main.go, maka harus di export (Huruf depannya huruf besar) wajib nama fungsi huruf depannya besar
+func (handler *BookHandler) RootHandler(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"name":    "Ardya Pusaka",
+		"message": "Hello, adas!",
+	})
+}
+
+func (handler *BookHandler) GetBooksHandler(c *gin.Context) {
+	books, err := handler.bookService.GetBooks()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, books)
 }
 
-func BookDetailHandler(c *gin.Context) {
-	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 32) // Konversi id dari string ke uint64
+func (handler *BookHandler) BookDetailHandler(c *gin.Context) {
+	id := c.Param("id")
+	bookID, err := strconv.Atoi(id)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "Invalid ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	for _, book := range books {
-		if book.ID == uint(id) { // Bandingkan dengan book.ID setelah konversi ke uint
-			c.JSON(http.StatusOK, book)
-			return
+	book, err := handler.bookService.GetBookByID(bookID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, book)
+}
+
+func (handler *BookHandler) BookPostHandler(c *gin.Context) {
+	var BookRequest models.BookRequest
+	err := c.ShouldBindJSON(&BookRequest)
+	if err != nil {
+		errorMessages := []string{}
+		for _, e := range err.(validator.ValidationErrors) {
+			message := fmt.Sprintf("Error on field %s, condition: %s", e.Field(), e.ActualTag())
+			errorMessages = append(errorMessages, message)
 		}
-	}
-	c.JSON(http.StatusNotFound, gin.H{"message": "Book not found"})
-}
-
-func BookPostHandler(c *gin.Context) {
-	var book models.Book
-	if err := c.ShouldBindJSON(&book); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": errorMessages,
+		})
 		return
 	}
-	books = append(books, book)
-	c.JSON(http.StatusCreated, book)
-}
 
-// contoh youtube :
-func PostBookHandler (c *gin.Context) {
-	var book models.Book
-	if err := c.ShouldBindJSON(&book); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	book, err := handler.bookService.CreateBook(BookRequest)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(200,gin.H{
-		"title" : book.Title,
-		"author" : book.Author,
-		"price" : book.Price,
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": book,
 	})
 }
+
+func (handler *BookHandler) BookUpdateHandler(c *gin.Context) {
+	id := c.Param("id")
+	bookID, err := strconv.Atoi(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var book models.Book
+	err = c.ShouldBindJSON(&book)
+	if err != nil {
+		errorMessages := []string{}
+		for _, e := range err.(validator.ValidationErrors) {
+			message := fmt.Sprintf("Error on field %s, condition: %s", e.Field(), e.ActualTag())
+			errorMessages = append(errorMessages, message)
+		}
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": errorMessages,
+		})
+		return
+	}
+
+	updatedBook, err := handler.bookService.UpdateBook(bookID, book)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, updatedBook)
+}
+
+
+
