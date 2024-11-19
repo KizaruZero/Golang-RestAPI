@@ -42,7 +42,7 @@ func (s *service) CreateBook(BookRequest BookRequest) (Book, error) {
 		Price:  BookRequest.Price,
 	}
 	return s.repository.CreateBook(book)
-} //karena disini beda dengan di repo untuk requestnya , disini minta bookreq sedangkan di repo minta book, jadi harus diubah dulu ke book
+} //karena disini beda dengan di repo untuk requestnya , disini minta bookreq sedangkan di repo minta book, jadi harus diubah dulu ke books
 
 // DeleteBook implements Service.
 func (s *service) DeleteBook(id int) error {
